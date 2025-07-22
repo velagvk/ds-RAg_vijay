@@ -2,7 +2,65 @@ import PIL.Image
 import os
 import io
 from ..utils.imports import vertexai, genai_new
+import base64
+import requests
+import mimetypes
 
+def make_llm_call_anthropic(image_path: str, system_message: str, model: str, max_tokens: int = 4000, temperature: float = 0.5):
+    """
+    Makes a call to an Anthropic model with vision capabilities via the ILIAD gateway.
+    """
+    ILIAD_API_KEY = os.environ.get("ILIAD_API_KEY")
+    anthropic_ILIAD_URL = "https://api-epic.ir-gateway.abbvienet.com/iliad/anthropic" # As per ai_audit_code.rtf
+
+    if not ILIAD_API_KEY:
+        raise ValueError("ILIAD_API_KEY environment variable not set.")
+
+    with open(image_path, "rb") as image_file:
+        encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+    media_type = mimetypes.guess_type(image_path)[0]
+    if not media_type:
+        media_type = "image/jpeg" # Default if guess fails
+
+    payload = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": system_message
+                    },
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": encoded_image
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    headers = {
+        "x-api-key": ILIAD_API_KEY,
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(f"{anthropic_ILIAD_URL}/messages", headers=headers, json=payload)
+    response.raise_for_status()
+    
+    response_json = response.json()
+    # The actual content is in the first item of the 'content' list
+    return response_json.get("content", [{}])[0].get("text", "")
+
+# Placeholder for Gemini function
 def make_llm_call_gemini(image_path: str, system_message: str, model: str = "gemini-2.0-flash", response_schema: dict = None, max_tokens: int = 4000, temperature: float = 0.5) -> str:
     # With the newer Google GenAI SDK, we need to create a client
     client = genai_new.Client(api_key=os.environ["GEMINI_API_KEY"])
@@ -70,6 +128,7 @@ def make_llm_call_gemini(image_path: str, system_message: str, model: str = "gem
             except Exception:
                 pass # Ignore errors if it fails (e.g., trying to close a None object or already closed and problematic)
 
+# Placeholder for Vertex function
 def make_llm_call_vertex(image_path: str, system_message: str, model: str, project_id: str, location: str, response_schema: dict = None, max_tokens: int = 4000, temperature: float = 0.5) -> str:
     """
     This function calls the Vertex AI Gemini API (not to be confused with the Gemini API) with an image and a system message and returns the response text.

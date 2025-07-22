@@ -62,6 +62,40 @@ class OpenAIChatAPI(LLM):
         })
         return base_dict
 
+class AzureOpenAIChatAPI(LLM):
+    def __init__(self, model: str = "gpt-4o", azure_deployment: str = "gpt-4o", api_version: str = "2023-07-01-preview", temperature: float = 0.2, max_tokens: int = 1000):
+        self.model = model
+        self.azure_deployment = azure_deployment
+        self.api_version = api_version
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+
+    def make_llm_call(self, chat_messages: list[dict]) -> str:
+        client = openai.AzureOpenAI(
+            api_key=os.environ.get("OPENAI_API_KEY"),
+            azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT"),
+            api_version=self.api_version,
+        )
+        response = client.chat.completions.create(
+            model=self.azure_deployment,
+            messages=chat_messages,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+        )
+        llm_output = response.choices[0].message.content.strip()
+        return llm_output
+    
+    def to_dict(self):
+        base_dict = super().to_dict()
+        base_dict.update({
+            'model': self.model,
+            'azure_deployment': self.azure_deployment,
+            'api_version': self.api_version,
+            'temperature': self.temperature,
+            'max_tokens': self.max_tokens,
+        })
+        return base_dict
+
 class AnthropicChatAPI(LLM):
     def __init__(self, model: str = "claude-3-haiku-20240307", temperature: float = 0.2, max_tokens: int = 1000):
         self.model = model

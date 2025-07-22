@@ -1,4 +1,4 @@
-from .vlm import make_llm_call_gemini, make_llm_call_vertex
+from .vlm import make_llm_call_gemini, make_llm_call_vertex, make_llm_call_anthropic
 from ..models.types import ElementType, Element, VLMConfig
 from .file_system import FileSystem
 from .element_types import (
@@ -218,9 +218,28 @@ def parse_page(kb_id: str, doc_id: str, file_system: FileSystem, page_number: in
                     "type": "text", 
                     "content": "Unable to process page"
                 }])
+    
+    elif vlm_config["provider"] == "anthropic":
+        try:
+            temperature = vlm_config.get("temperature", 0.5)
+            
+            llm_output = make_llm_call_anthropic(
+                image_path=page_image_path, 
+                system_message=system_message, 
+                model=vlm_config["model"],
+                max_tokens=vlm_config.get("max_tokens", 4000),
+                temperature=temperature
+            )
+        except Exception as e:
+            base_extra = {"kb_id": kb_id, "doc_id": doc_id, "page_number": page_number}
+            logger.error(f"Error in make_llm_call_anthropic: {e}", extra=base_extra)
+            llm_output = json.dumps([{
+                "type": "text", 
+                "content": "Unable to process page"
+            }])
                     
     else:
-        raise ValueError("Invalid provider specified in the VLM config. Only 'vertex_ai' and 'gemini' are supported for now.")
+        raise ValueError("Invalid provider specified in the VLM config. Only 'vertex_ai', 'gemini', and 'anthropic' are supported for now.")
     
     try:
         page_content = json.loads(llm_output)
