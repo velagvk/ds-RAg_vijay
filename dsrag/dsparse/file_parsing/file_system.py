@@ -55,6 +55,10 @@ class FileSystem(ABC):
         pass
 
     @abstractmethod
+    def save_image_bytes(self, kb_id: str, doc_id: str, file_name: str, image_bytes: bytes) -> None:
+        pass
+
+    @abstractmethod
     def get_files(self, kb_id: str, doc_id: str, page_start: int, page_end: int) -> List[str]:
         pass
 
@@ -149,6 +153,14 @@ class LocalFileSystem(FileSystem):
         """
         image_path = os.path.join(self.base_path, kb_id, doc_id, file_name)
         image.save(image_path)
+
+    def save_image_bytes(self, kb_id: str, doc_id: str, file_name: str, image_bytes: bytes) -> None:
+        """
+        Save the image bytes to the local system
+        """
+        image_path = os.path.join(self.base_path, kb_id, doc_id, file_name)
+        with open(image_path, "wb") as f:
+            f.write(image_bytes)
 
     def get_files(self, kb_id: str, doc_id: str, page_start: int, page_end: int) -> List[str]:
         """
@@ -335,6 +347,25 @@ class S3FileSystem(FileSystem):
         buffer = io.BytesIO()
         file.save(buffer, format='JPEG')
         buffer.seek(0)  # Rewind the buffer to the beginning
+
+        s3_client = self.create_s3_client()
+        try:
+            s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=file_name,
+                Body=buffer,
+                ContentType='image/jpeg'
+            )
+            print(f"JPEG uploaded to {self.bucket_name}/{file_name}.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to upload image to S3.") from e
+
+    def save_image_bytes(self, kb_id: str, doc_id: str, file_name: str, image_bytes: bytes) -> None:
+        """
+        Upload the image bytes to S3
+        """
+        file_name = f"{kb_id}/{doc_id}/{file_name}"
+        buffer = io.BytesIO(image_bytes)
 
         s3_client = self.create_s3_client()
         try:

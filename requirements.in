@@ -17,6 +17,5 @@ instructor>=1.7.0  # Required for streaming functionality
 scipy>=1.10.0
 scikit-learn>=1.2.0
 pillow>=10.0.0
-pdf2image>=1.16.0
+PyMuPDF>=1.24.5
 docx2txt>=0.8
-pypdf>=3.0.1

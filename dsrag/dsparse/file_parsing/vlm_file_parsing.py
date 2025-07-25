@@ -9,7 +9,7 @@ from .element_types import (
     get_num_visual_elements,
     get_num_non_visual_elements,
 )
-from pdf2image import convert_from_path
+import fitz  # PyMuPDF
 import json
 import time
 import logging
@@ -74,9 +74,10 @@ def get_page_count(file_path: str, kb_id: str = "", doc_id: str = ""):
         base_extra["doc_id"] = doc_id
         
     try:
-        with open(file_path, "rb") as pdf_file:
-            pdf_reader = PdfReader(pdf_file)
-            return len(pdf_reader.pages)
+        doc = fitz.open(file_path)
+        page_count = doc.page_count
+        doc.close()
+        return page_count
     except Exception as e:
         logger.error(f"Error getting page count: {e}", extra={
             **base_extra,
@@ -86,7 +87,7 @@ def get_page_count(file_path: str, kb_id: str = "", doc_id: str = ""):
 
 def pdf_to_images(pdf_path: str, kb_id: str, doc_id: str, file_system: FileSystem, dpi=100, max_workers: int=2, max_pages: int=10) -> list[str]:
     """
-    Convert a PDF to images and save them to a folder. Uses pdf2image (which relies on poppler).
+    Convert a PDF to images and save them to a folder. Uses PyMuPDF (fitz).
 
     Inputs:
     - pdf_path: str - the path to the PDF file.
@@ -109,27 +110,34 @@ def pdf_to_images(pdf_path: str, kb_id: str, doc_id: str, file_system: FileSyste
     file_system.create_directory(kb_id, doc_id)
 
     def save_single_image(args):
-        i, image = args
-        file_system.save_image(kb_id, doc_id, f'page_{i+1}.jpg', image)
+        i, page = args
+        pix = page.get_pixmap(dpi=dpi)
+        image_bytes = pix.tobytes("jpeg")
+        file_system.save_image_bytes(kb_id, doc_id, f'page_{i+1}.jpg', image_bytes)
         return f'/{kb_id}/{doc_id}/page_{i+1}.jpg'
 
     # Convert PDF to images in batches of max_pages
-    page_count = get_page_count(pdf_path, kb_id, doc_id)
+    doc = fitz.open(pdf_path)
+    page_count = doc.page_count
     all_image_paths = []
     
-    for i in range(1, page_count + 1, max_pages):
-        logger.debug(f"Converting pages {i} to {i + max_pages-1}", extra=base_extra)
-        last_page = min(i + max_pages-1, page_count)
-        images = convert_from_path(pdf_path, dpi=dpi, thread_count=max_workers, 
-                                 first_page=i, last_page=last_page)
+    for i in range(0, page_count, max_pages):
+        logger.debug(f"Converting pages {i+1} to {min(i + max_pages, page_count)}", extra=base_extra)
+        start_page = i
+        end_page = min(i + max_pages, page_count)
+        
+        pages_to_process = []
+        for page_num in range(start_page, end_page):
+            pages_to_process.append((page_num, doc.load_page(page_num)))
         
         # Save batch of images in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            batch_paths = list(executor.map(save_single_image, enumerate(images, start=i-1)))
+            batch_paths = list(executor.map(save_single_image, pages_to_process))
             all_image_paths.extend(batch_paths)
         
-        logger.debug(f"Converted pages {i} to {last_page}", extra=base_extra)
+        logger.debug(f"Converted pages {start_page+1} to {end_page}", extra=base_extra)
 
+    doc.close()
     logger.info(f"Converted total {len(all_image_paths)} pages to images", extra=base_extra)
     return all_image_paths
 
