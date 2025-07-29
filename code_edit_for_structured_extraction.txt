@@ -141,3 +141,104 @@ Complex and multi-part figures or images should be represented as a single eleme
             element_description_block=get_element_description_block(element_types)
         )
         response_schema_to_use = response_schema
+
+
+
+
+
+
+def _serialize_table_content(content: dict) -> str:
+    """
+    Serializes a structured table dictionary into a Markdown string.
+    """
+    markdown_parts = []
+    
+    # Handle table title
+    if "title" in content and content["title"]:
+        markdown_parts.append(f"### {content['title']}")
+
+    # Handle table headers and data
+    if "headers" in content and content["headers"]:
+        headers = content["headers"]
+        header_line = "| " + " | ".join(map(str, headers)) + " |"
+        separator_line = "| " + " | ".join(["---"] * len(headers)) + " |"
+        markdown_parts.append(header_line)
+        markdown_parts.append(separator_line)
+
+        if "data" in content and content["data"]:
+            for row in content["data"]:
+                row_line = "| " + " | ".join(map(str, row)) + " |"
+                markdown_parts.append(row_line)
+    
+    # Handle table notes
+    if "notes" in content and content["notes"]:
+        # Add a newline for spacing if there was a table body
+        if markdown_parts:
+            markdown_parts.append("")
+        markdown_parts.append(f"Notes: {content['notes']}")
+
+    return "\n".join(markdown_parts)
+
+def elements_to_lines(
+    elements: List[Element],
+    exclude_elements: List[str],
+    visual_elements: List[str],
+    max_line_length: int = 200
+) -> List[Line]:
+    """
+    Converts a list of Element objects into a list of Line objects.
+    Handles serialization of structured table content.
+    """
+    document_lines = []
+    for element in elements:
+        try:
+            if element["type"] in exclude_elements:
+                continue
+
+            element_content = element["content"]
+            is_visual = element["type"] in visual_elements
+
+            # Serialize structured table content to Markdown string
+            if isinstance(element_content, dict):
+                if element["type"] == "Table":
+                    element_content = _serialize_table_content(element_content)
+                else:
+                    # For other potential dicts, just convert to string representation
+                    element_content = str(element_content)
+            
+            # Non-visual elements are split by newlines and have their lines constrained
+            if not is_visual:
+                lines = element_content.split("\n")
+                for line in lines:
+                    if len(line) <= max_line_length:
+                        document_lines.append({
+                            "content": line,
+                            "element_type": element["type"],
+                            "page_number": element.get("page_number", None),
+                            "is_visual": False,
+                        })
+                    else:
+                        # Split long lines
+                        split_lines = split_long_line(line, max_line_length)
+                        for split_line in split_lines:
+                            document_lines.append({
+                                "content": split_line,
+                                "element_type": element["type"],
+                                "page_number": element.get("page_number", None),
+                                "is_visual": False,
+                            })
+            else:
+                # Visual elements are not split
+                document_lines.append({
+                    "content": element_content,
+                    "element_type": element["type"],
+                    "page_number": element.get("page_number", None),
+                    "is_visual": True,
+                })
+
+        except Exception as e:
+            logger.error(f"Error in elements_to_lines: {e}")
+            logger.error(f"Problematic Element: {element}")
+            raise e
+    
+    return document_lines
