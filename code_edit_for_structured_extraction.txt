@@ -115,3 +115,29 @@ Output format
 Complex and multi-part figures or images should be represented as a single element. For example, if a figure consists of a main chart and a smaller inset chart, these should be described together in a single Figure element. If there are two separate graphs side by side, these should be represented as a single Figure element with a bounding box that encompasses both graphs. DO NOT create separate elements for each part of a complex figure or image.
 
 """
+
+
+
+  has_structured_tables = any(
+        element_type.get("extract_structure", False) for element_type in element_types
+    )
+    
+    # Choose appropriate system message and response schema
+    if has_structured_tables:
+        system_message = TABLE_SYSTEM_MESSAGE.format(
+            num_visual_elements=get_num_visual_elements(element_types),
+            num_non_visual_elements=get_num_non_visual_elements(element_types),
+            visual_elements_as_str=get_visual_elements_as_str(element_types),
+            non_visual_elements_as_str=get_non_visual_elements_as_str(element_types),
+            element_description_block=get_element_description_block(element_types)
+        )
+        response_schema_to_use = table_response_schema
+    else:
+        system_message = SYSTEM_MESSAGE.format(
+            num_visual_elements=get_num_visual_elements(element_types),
+            num_non_visual_elements=get_num_non_visual_elements(element_types),
+            visual_elements_as_str=get_visual_elements_as_str(element_types),
+            non_visual_elements_as_str=get_non_visual_elements_as_str(element_types),
+            element_description_block=get_element_description_block(element_types)
+        )
+        response_schema_to_use = response_schema
