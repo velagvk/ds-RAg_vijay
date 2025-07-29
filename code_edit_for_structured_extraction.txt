@@ -242,3 +242,200 @@ def elements_to_lines(
             raise e
     
     return document_lines
+
+
+
+
+# In dsrag/dsparse/file_parsing/vlm_file_parsing.py
+
+table_response_schema = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "type": {
+                "type": "string",
+            },
+            "content": {
+                "oneOf": [
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string",
+                                "description": "Title or caption of the table if present"
+                            },
+                            "overall_summary": {
+                                "type": "string",
+                                "description": "A high-level summary of the entire table's content and purpose"
+                            },
+                            "headers": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Column headers of the table"
+                            },
+                            "data": {
+                                "type": "array",
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "description": "Table data as array of rows"
+                            },
+                            "row_summaries": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Natural language summary for each row"
+                            },
+                            "column_summaries": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Natural language summary for each column, keyed by column header"
+                            },
+                            "notes": {
+                                "type": "string",
+                                "description": "Any footnotes or notes associated with the table"
+                            }
+                        },
+                        "required": ["headers", "data", "overall_summary", "row_summaries", "column_summaries"]
+                    }
+                ]
+            },
+        },
+        "required": ["type", "content"],
+    },
+}
+
+# Update the TABLE_SYSTEM_MESSAGE to instruct the VLM to generate hierarchical summaries
+TABLE_SYSTEM_MESSAGE = """
+You are a PDF -> structured data parser. Your task is to analyze the provided PDF page (provided as an image) and return a structured JSON response containing all of the elements on the page. Each element must be represented using Markdown formatting.
+
+...
+
+**SPECIAL HANDLING FOR TABLES:**
+For Table elements, you must provide structured data in the "content" field as a JSON object with the following hierarchical summary structure:
+
+1. Overall Summary:
+   - Provide a comprehensive summary of the entire table's purpose and content
+   - Include the main topic, time period, and key metrics covered
+
+2. Row-Level Summaries:
+   - For each row, create a natural language summary that combines:
+     * The row's position or context in the table
+     * The values from each column with their corresponding headers
+     * Any relevant relationships between the values
+
+3. Column-Level Summaries:
+   - For each column, create a summary that describes:
+     * The type of data in the column
+     * The range or pattern of values
+     * Any trends or notable characteristics
+
+Example table structure:
+{
+  "title": "Financial Performance 2023",
+  "overall_summary": "This table presents quarterly financial metrics for Meta in 2023, showing consistent revenue growth from Q1 to Q4, with the highest profit margins in Q4.",
+  "headers": ["Quarter", "Revenue", "Profit"],
+  "data": [
+    ["Q1", "$100M", "$20M"],
+    ["Q2", "$120M", "$25M"],
+    ["Q3", "$110M", "$22M"],
+    ["Q4", "$130M", "$28M"]
+  ],
+  "row_summaries": [
+    "In Q1 2023, Meta generated revenue of $100M with profits of $20M, representing the lowest quarterly performance.",
+    "Q2 2023 showed improvement with revenue increasing to $120M and profits reaching $25M.",
+    "Q3 2023 saw a slight decline with revenue at $110M and profits at $22M.",
+    "Q4 2023 marked the strongest performance with peak revenue of $130M and highest profits of $28M."
+  ],
+  "column_summaries": {
+    "Quarter": "The data spans all four quarters of 2023, showing a complete annual cycle.",
+    "Revenue": "Revenue fluctuated between $100M and $130M, with an overall upward trend and peak in Q4.",
+    "Profit": "Profits ranged from $20M to $28M, maintaining a consistent ratio to revenue around 20-22%."
+  },
+  "notes": "All figures in USD"
+}
+
+When generating summaries:
+1. Row Summaries:
+   - Create a natural sentence that incorporates all values in the row
+   - Include relationships between different columns
+   - Highlight any notable patterns or extremes
+
+2. Column Summaries:
+   - Analyze the entire column's data to identify patterns
+   - Include ranges, trends, and distributions
+   - Reference the column's context in the overall table
+
+3. Overall Summary:
+   - Combine insights from both row and column analyses
+   - Highlight the most important patterns or findings
+   - Include the table's purpose and significance in the document
+
+For non-Table visual elements ({visual_elements_as_str}), you must provide a detailed description...
+"""
+
+
+def _serialize_table_content(content: dict) -> str:
+    """
+    Serializes a structured table dictionary into a Markdown string with hierarchical summaries.
+    """
+    markdown_parts = []
+    
+    # Add the overall summary at the top
+    if "overall_summary" in content and content["overall_summary"]:
+        markdown_parts.append("### Table Overview")
+        markdown_parts.append(content["overall_summary"])
+        markdown_parts.append("")  # Empty line for spacing
+    
+    # Add title if present
+    if "title" in content and content["title"]:
+        markdown_parts.append(f"### {content['title']}")
+        markdown_parts.append("")
+
+    # Add the actual table
+    if "headers" in content and content["headers"]:
+        headers = content["headers"]
+        header_line = "| " + " | ".join(map(str, headers)) + " |"
+        separator_line = "| " + " | ".join(["---"] * len(headers)) + " |"
+        markdown_parts.append(header_line)
+        markdown_parts.append(separator_line)
+
+        if "data" in content and content["data"]:
+            for row in content["data"]:
+                row_line = "| " + " | ".join(map(str, row)) + " |"
+                markdown_parts.append(row_line)
+    
+    markdown_parts.append("")  # Empty line for spacing
+
+    # Add row summaries
+    if "row_summaries" in content and content["row_summaries"]:
+        markdown_parts.append("### Row-by-Row Analysis")
+        for i, summary in enumerate(content["row_summaries"], 1):
+            markdown_parts.append(f"{i}. {summary}")
+        markdown_parts.append("")
+
+    # Add column summaries
+    if "column_summaries" in content and content["column_summaries"]:
+        markdown_parts.append("### Column Analysis")
+        for header, summary in content["column_summaries"].items():
+            markdown_parts.append(f"**{header}**: {summary}")
+        markdown_parts.append("")
+
+    # Add notes if present
+    if "notes" in content and content["notes"]:
+        markdown_parts.append("### Notes")
+        markdown_parts.append(content["notes"])
+
+    return "\n".join(markdown_parts)
