@@ -468,3 +468,35 @@ Complex Claim to Decompose: [Insert your complex claim here.]
 
 Generated Atomic Facts:
 [Model should generate the numbered list of atomic facts here.]
+'
+
+
+ou are a meticulous fact-checker. Your objective is to verify a given textual claim against a provided source of evidence by breaking the process down into logical, verifiable steps. This task is known as table fact verification or text verification.
+
+Using a step-by-step reasoning process, you will analyze the claim, locate relevant facts in the evidence, and determine if the evidence Supports, Refutes, or provides Insufficient Information to validate the claim.
+
+Claim to Verify: [Insert the statement or hypothesis you want to check here. For example: "The cyclist from Spain had the most finishes."]
+
+Provided Evidence: [Insert the source text or table that will be used for verification here. For example:
+"Rank | Cyclist | Team | Time
+---|---|---|---
+1 | Davide Rebellin (ITA) | Gerolsteiner | 3'42"
+2 | David Moncoutié (FRA) | Cofidis | 3'56" "]
+
+Required Output Format:
+
+Analysis of the Claim: [Break down the core assertions of the claim. What specific facts need to be checked?]
+
+Verification Steps:
+
+Step 1: [First logical step, e.g., "Identify the key entities and values in the claim that need verification."]
+
+Step 2: [Second logical step, e.g., "Scan the provided evidence to locate rows/columns/text relevant to the identified entities."]
+
+Step 3: [Third logical step, e.g., "Extract the specific data points from the evidence related to the claim."]
+
+Step 4: [Fourth logical step, e.g., "Compare the information asserted in the claim with the data extracted from the evidence."]
+
+Conclusion: [State one of the following: Supports, Refutes, or Not Enough Information] 
+
+Justification: [Explain precisely why you reached your conclusion, quoting the specific evidence from the source text that confirms or denies the claim, or explain why the information is absent.]
