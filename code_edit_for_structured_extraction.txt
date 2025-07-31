@@ -439,3 +439,32 @@ def _serialize_table_content(content: dict) -> str:
         markdown_parts.append(content["notes"])
 
     return "\n".join(markdown_parts)
+
+
+
+Of course. Here is a prompt specifically designed to ask a model to take a complex claim and decompose it into a list of verifiable atomic facts.
+
+Prompt:
+
+You are an expert in logical analysis. Your task is to decompose a complex statement into its fundamental, atomic facts. An "atomic fact" is a simple, indivisible assertion that contains a single piece of information and can be verified independently.
+
+Please read the following complex claim and break it down into a numbered list of its atomic facts. Each fact in the list should be a standalone statement.
+
+Example:
+
+Complex Claim: "The top-ranked cyclist, Davide Rebellin from Italy, finished the race in under 4 minutes on the Gerolsteiner team."
+
+Generated Atomic Facts:
+
+The cyclist with rank 1 is named Davide Rebellin.
+
+Davide Rebellin is from Italy.
+
+Davide Rebellin's finishing time was under 4 minutes.
+
+Davide Rebellin's team is Gerolsteiner.
+
+Complex Claim to Decompose: [Insert your complex claim here.]
+
+Generated Atomic Facts:
+[Model should generate the numbered list of atomic facts here.]
